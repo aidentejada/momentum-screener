@@ -13,6 +13,10 @@ def datafetcher():
     # import list of stocks
     stocks = pd.read_csv("sp500.csv")
     momentum_stocks = []
+    
+    # capm parameters
+    risk_free_rate = 0.041  # 4.1%
+    market_return = 0.095   # 9.5%
 
     for stock in stocks['Symbol']:
         try:
@@ -24,6 +28,17 @@ def datafetcher():
             
             # current price
             current_price = hist['Close'].iloc[-1]
+            
+            # fetch beta for capm calculation
+            try:
+                beta = ticker.info.get('beta')
+                if beta is None or not isinstance(beta, (int, float)):
+                    beta = 1.0  # default beta
+            except:
+                beta = 1.0  # default beta if fetch fails
+            
+            # calculate expected return using capm
+            expected_return = risk_free_rate + beta * (market_return - risk_free_rate)
             
             # pulls prices for different periods
             price_1yr_ago = hist['Close'].iloc[0]
@@ -50,7 +65,9 @@ def datafetcher():
                 'N/A',
                 one_mo_return,
                 'N/A',
-                0 # placeholder for hqm scores
+                0, # placeholder for hqm scores
+                beta,
+                expected_return
             ])
             
         except Exception as e:
@@ -68,7 +85,9 @@ def datafetcher():
         "3mo Return Percentile",
         "1mo Price Return",
         "1mo Return Percentile",
-        "HQM Score"
+        "HQM Score",
+        "Beta",
+        "Expected Return"
         ]
     hqm_df = pd.DataFrame(momentum_stocks, columns=columns)
 
@@ -220,6 +239,10 @@ def portfolio():
     # risk summary
     weighted_volatility = (hqm_df['Volatility'] * hqm_df['Weight']).sum()
     print(f"Portfolio Risk Score: {weighted_volatility:.3f} (lower is better)")
+    
+    # calculate and display portfolio expected return using capm
+    portfolio_expected_return = (hqm_df['Expected Return'] * hqm_df['Weight']).sum()
+    print(f"Portfolio Expected Return (CAPM): {portfolio_expected_return:.2%}")
 
 
 def xlsx_writer():
@@ -287,147 +310,14 @@ def xlsx_writer():
         "M": ["Volatility", decimal_template],
         "N": ["Risk Adjusted Score", decimal_template],
         "O": ["Weight", percent_template],
-        "P": ["Position Value", dollar_template]
+        "P": ["Position Value", dollar_template],
+        "Q": ["Beta", decimal_template],
+        "R": ["Expected Return", percent_template]
     }
     for column in columns_format.keys():
         writer.sheets['Momentum Strategy'].set_column(f'{column}:{column}', 25, columns_format[column][1])
         writer.sheets['Momentum Strategy'].write(f'{column}1', columns_format[column][0], columns_format[column][1])
     writer.close()
-
-def backtest():
-    """
-    Backtests the momentum strategy over 5 years, compares to S&P 500, 
-    and projects returns through end of year
-    """
-    print("\n" + "="*60)
-    print("5-YEAR MOMENTUM STRATEGY BACKTEST")
-    print("="*60)
-    
-    # Get 5 years of S&P 500 data for benchmark
-    spy = yf.Ticker("SPY")
-    spy_hist = spy.history(period="5y")
-    
-    if len(spy_hist) < 1000:  # Need substantial data
-        print("Insufficient data for 5-year backtesting")
-        return
-    
-    # Calculate S&P 500 5-year performance
-    spy_start = spy_hist['Close'].iloc[0]
-    spy_end = spy_hist['Close'].iloc[-1]
-    spy_total_return = (spy_end - spy_start) / spy_start
-    spy_annual_return = (1 + spy_total_return) ** (1/5) - 1
-    
-    print(f"Backtesting period: {spy_hist.index[0].date()} to {spy_hist.index[-1].date()}")
-    print(f"S&P 500 Benchmark:")
-    print(f"  5-Year Total Return: {spy_total_return:.1%}")
-    print(f"  Annualized Return: {spy_annual_return:.1%}")
-    
-    # Strategy backtesting - simulate rebalancing annually
-    strategy_returns = []
-    years_data = []
-    
-    for year in range(5):
-        year_start_idx = int(len(spy_hist) * year / 5)
-        year_end_idx = int(len(spy_hist) * (year + 1) / 5) - 1
-        
-        if year_end_idx >= len(spy_hist):
-            year_end_idx = len(spy_hist) - 1
-        
-        # For each year, test our top momentum stocks
-        year_return = 0
-        valid_stocks = 0
-        
-        for i in range(min(20, len(hqm_df))):
-            ticker = hqm_df.iloc[i]['Ticker']
-            
-            try:
-                stock_data = yf.Ticker(ticker)
-                stock_hist = stock_data.history(period="5y")
-                
-                if len(stock_hist) < year_end_idx + 10:
-                    continue
-                
-                # Calculate this stock's return for the year
-                start_price = stock_hist['Close'].iloc[year_start_idx]
-                end_price = stock_hist['Close'].iloc[year_end_idx]
-                stock_year_return = (end_price - start_price) / start_price
-                
-                year_return += stock_year_return
-                valid_stocks += 1
-                
-            except:
-                continue
-        
-        if valid_stocks > 0:
-            avg_year_return = year_return / valid_stocks
-            strategy_returns.append(avg_year_return)
-            years_data.append({
-                'year': year + 1,
-                'return': avg_year_return,
-                'valid_stocks': valid_stocks
-            })
-    
-    if len(strategy_returns) == 0:
-        print("Unable to calculate strategy returns")
-        return
-    
-    # Calculate strategy performance metrics
-    strategy_total_return = 1
-    for annual_return in strategy_returns:
-        strategy_total_return *= (1 + annual_return)
-    strategy_total_return -= 1
-    
-    strategy_annual_return = (1 + strategy_total_return) ** (1/5) - 1
-    strategy_volatility = np.std(strategy_returns)
-    
-    # Performance comparison
-    print(f"\nMOMENTUM STRATEGY RESULTS:")
-    print(f"  5-Year Total Return: {strategy_total_return:.1%}")
-    print(f"  Annualized Return: {strategy_annual_return:.1%}")
-    print(f"  Annual Volatility: {strategy_volatility:.1%}")
-    
-    excess_return = strategy_annual_return - spy_annual_return
-    print(f"\nPERFORMANCE vs S&P 500:")
-    print(f"  Excess Annual Return: {excess_return:+.1%}")
-    print(f"  Outperformed S&P 500: {'YES' if excess_return > 0 else 'NO'}")
-    
-    # Year-by-year breakdown
-    print(f"\nYEAR-BY-YEAR PERFORMANCE:")
-    print(f"{'Year':<6} {'Strategy':<12} {'Stocks Used'}")
-    print("-" * 30)
-    for year_data in years_data:
-        print(f"{year_data['year']:<6} {year_data['return']:<11.1%} {year_data['valid_stocks']}")
-    
-    # project returns from oct 1 2025 to oct 1 2026
-    from datetime import datetime
-    
-    oct_1_2025 = datetime(2025, 10, 1)
-    oct_1_2026 = datetime(2026, 10, 1)
-    current_date = datetime.now()
-    
-    # calculate how much of the projection period has passed
-    if current_date > oct_1_2025:
-        days_passed = (current_date - oct_1_2025).days
-        days_total = (oct_1_2026 - oct_1_2025).days
-        fraction_remaining = (days_total - days_passed) / days_total
-    else:
-        fraction_remaining = 1.0  # full year projection
-    
-    projected_return = strategy_annual_return * fraction_remaining
-    
-    print(f"Projected return (Oct 1 2025 - Oct 1 2026): {projected_return:.1%}")
-    
-    # final summary statement
-    excess_return = strategy_annual_return - spy_annual_return
-    print(f"\nStrategy outperformed S&P 500 by {excess_return:+.1%} over the 5-year period (2020-2025), expected to return {projected_return:.1%} from Oct 1 2025 to Oct 1 2026.")
-    
-    return {
-        'strategy_annual_return': strategy_annual_return,
-        'strategy_total_return': strategy_total_return,
-        'spy_annual_return': spy_annual_return,
-        'excess_return': excess_return,
-        'outperformed': excess_return > 0
-    }
 
 
 
@@ -435,5 +325,7 @@ def main():
     datafetcher()
     portfolio()
     xlsx_writer()
-    backtest()
+
+
+
 main()
