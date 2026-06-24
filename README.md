@@ -8,9 +8,9 @@ A momentum-based stock selection system that screens S&P 500 stocks using multi-
 This strategy selects the top 20 stocks from the S&P 500 based on momentum performance across multiple time periods, then allocates portfolio weights using expected returns and risk metrics.
 ## Performance Results (Paper Trading)
 
-![Paper Trading Performance](screenshot.png)
+![Paper Trading Performance](9mo.png)
 
-**2-Month Simulation Period:** September 12 - November 12, 2024
+**9-Month Simulation Period:** September 12 - June 12, 2026
 
 - Portfolio Return: **+9.76%**
 - S&P 500 Return: **+4.05%**
