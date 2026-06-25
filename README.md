@@ -8,16 +8,30 @@ A momentum-based stock selection system that screens S&P 500 stocks using multi-
 This strategy selects the top 20 stocks from the S&P 500 based on momentum performance across multiple time periods, then allocates portfolio weights using expected returns and risk metrics.
 ## Performance Results (Paper Trading)
 
-![Paper Trading Performance](9mo.png)
+![Paper Trading Performance](9mos.png)
 
-**9-Month Simulation Period:** September 12 - June 12, 2026
+**9-Month Simulation Period:** September 2025 - June 2026
 
-- Portfolio Return: **+9.76%**
-- S&P 500 Return: **+4.05%**
-- Outperformance: **+5.71%** (571 basis points)
+- S&P 500 growth: (7,358.22 − 6,584.29) / 6,584.29 × 100 = **+11.75%**
+- Portfolio growth: $80,015 / $100,000 = **+80.02%**
+- Outperformance: 80.02% − 11.75% = +68.27 percentage points = **6,827 basis points**
 - Strategy maintained positive performance throughout the period with no negative weekly closes
 
-*Note: This represents early-stage validation over a limited timeframe. Two months is insufficient to draw meaningful conclusions about strategy efficacy. Further backtesting across multiple market cycles is required.*
+
+## These were the top 5 screener picks as seen in (/momentum_strategy.xlsx)
+*Performance as of June 24, 2026 (~9 months)*
+
+| Rank | Ticker | Avg Cost | Last Price | Return | P&L |
+|:----:|:------:|---------:|-----------:|-------:|----:|
+| #1 | WDC  | $95.07  | $706.00   | +642.61% | +$38,488.59 |
+| #2 | STX  | $191.32 | $1,057.86 | +452.93% | +$24,263.12 |
+| #3 | AVGO | $337.58 | $387.00   | +14.64%  | +$642.46    |
+| #4 | RCL  | $351.54 | $320.00   | −8.97%   | −$567.72    |
+| #5 | CCL  | $31.87  | $29.05    | −8.85%   | −$583.74    |
+
+**Top-5 average return:** +218.47%
+**Top-5 combined P&L:** +$62,242.71
+
 
 ## Strategy Components
 
